@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#082f49">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Science Rift</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06131c;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff}
+button{font:inherit}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block;background:#06131c;touch-action:none}
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;pointer-events:none}
+.panel{pointer-events:auto;width:min(92vw,520px);max-height:92vh;overflow:auto;padding:24px;border:1px solid rgba(255,255,255,.2);border-radius:26px;background:rgba(5,18,28,.62);backdrop-filter:blur(14px);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.hidden{display:none!important}
+h1{font-size:clamp(38px,10vw,72px);margin:0 0 6px;letter-spacing:2px}
+h2{margin:0 0 12px}
+.sub{opacity:.82;margin:0 0 20px}
+.btn{width:100%;margin:7px 0;padding:14px 16px;border:0;border-radius:15px;color:#fff;background:rgba(255,255,255,.12);cursor:pointer;font-weight:700}
+.btn.primary{background:linear-gradient(135deg,#13b9d6,#2563eb)}
+.btn:active{transform:scale(.98)}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.stat{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+#hud{position:fixed;left:0;right:0;top:0;padding:12px 14px;display:none;justify-content:space-between;align-items:flex-start;pointer-events:none}
+.hudbox{padding:8px 12px;border-radius:14px;background:rgba(0,0,0,.28);backdrop-filter:blur(8px);font-weight:700}
+#jumpBtn{position:fixed;right:18px;bottom:20px;width:98px;height:98px;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.32),rgba(255,255,255,.08));color:white;font-weight:900;display:none;z-index:5;touch-action:none;box-shadow:0 8px 30px rgba(0,0,0,.25),inset 0 0 20px rgba(255,255,255,.08);backdrop-filter:blur(8px)}
+#pauseBtn{position:fixed;right:14px;top:62px;display:none;z-index:5;background:rgba(0,0,0,.28);border:0;border-radius:12px;color:white;padding:9px 12px;backdrop-filter:blur(8px)}
+#menuBtn{position:fixed;left:14px;top:62px;display:none;z-index:5;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.18);border-radius:12px;color:white;padding:9px 12px;backdrop-filter:blur(8px)}
+#toast{position:fixed;left:50%;bottom:130px;transform:translateX(-50%);padding:11px 16px;border-radius:14px;background:rgba(0,0,0,.7);opacity:0;transition:.2s;pointer-events:none;z-index:10}
+#toast.show{opacity:1}
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.42);z-index:8}
+.question{width:min(92vw,560px);padding:22px;border-radius:24px;background:rgba(7,25,38,.95);border:1px solid rgba(255,255,255,.2)}
+.answer{width:100%;text-align:left;padding:13px;margin:6px 0;border:1px solid rgba(255,255,255,.15);border-radius:13px;background:rgba(255,255,255,.08);color:white;cursor:pointer}
+.small{font-size:13px;opacity:.75;line-height:1.55}
+.range{width:100%}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="menu" class="screen">
+  <div class="panel">
+    <h1>SCIENCE RIFT</h1>
+    <p class="sub">วิ่ง • กระโดด • Double Jump • เก็บเหรียญ • ตอบคำถามวิทยาศาสตร์</p>
+    <button class="btn primary" id="startBtn">▶ เริ่มเกม</button>
+    <div class="row">
+      <button class="btn" id="shopBtn">🛒 ร้านค้า</button>
+      <button class="btn" id="statsBtn">📊 สถิติ</button>
+    </div>
+    <div class="row">
+      <button class="btn" id="settingsBtn">⚙️ ตั้งค่า</button>
+      <button class="btn" id="howBtn">❓ วิธีเล่น</button>
+    </div>
+    <div class="stat"><span>🪙 เหรียญ</span><b id="menuCoins">0</b></div>
+    <p class="small">เวอร์ชัน 2: Animated Prototype สำหรับงาน PWA — รองรับคอมและมือถือแนวตั้ง</p>
+  </div>
+</div>
+
+<div id="hud">
+  <div class="hudbox">🪙 <span id="coins">0</span></div>
+  <div class="hudbox">🌌 ด่าน <span id="stage">1</span>/5</div>
+  <div class="hudbox">📏 <span id="distance">0</span> m</div>
+</div>
+<button id="menuBtn">⌂ MENU</button>
+<button id="pauseBtn">Ⅱ</button>
+<button id="jumpBtn">JUMP</button>
+<div id="toast"></div>
+
+<div id="infoModal" class="modal hidden"><div class="question" id="infoContent"></div></div>
+<div id="failOverlay" class="modal hidden"><div class="question">
+  <h2>💥 พลาด!</h2><p id="failMessage">ตกจากเส้นทาง</p>
+  <button class="btn primary" id="retryBtn">🔄 เริ่มด่านใหม่</button>
+  <button class="btn" id="failMenuBtn">⌂ กลับหน้าเมนู</button>
+</div></div>
+<div id="questionModal" class="modal hidden"><div class="question">
+  <div class="small" id="qStage"></div><h2 id="qText"></h2><div id="answers"></div>
+</div></div>
+
+<script>
+"use strict";
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+let W=innerWidth,H=innerHeight,DPR=Math.min(devicePixelRatio||1,2);
+function resize(){W=innerWidth;H=innerHeight;canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.width=W+"px";canvas.style.height=H+"px";ctx.setTransform(DPR,0,0,DPR,0,0)}
+addEventListener("resize",resize); resize();
+
+const $=id=>document.getElementById(id);
+const saveKey="scienceRiftSaveV1";
+let save=JSON.parse(localStorage.getItem(saveKey)||"null")||{
+ coins:0,best:0,distance:0,falls:0,questions:0,correct:0,portals:0,
+ music:.35,sfx:.7,owned:["default"],selected:"default",usedQuestions:[]
+};
+function persist(){localStorage.setItem(saveKey,JSON.stringify(save)); updateMenu();}
+function updateMenu(){$("menuCoins").textContent=save.coins.toLocaleString()}
+
+const stages=[
+ {name:"Swamp of Life",emoji:"🌿",bg:"#12a9a4",water:"#159fb4",platform:"#f5dca0",accent:"#7ef7dd",hazard:"water"},
+ {name:"Lava Core",emoji:"🔥",bg:"#35151a",water:"#d44a19",platform:"#e7c28a",accent:"#ffb32e",hazard:"lava"},
+ {name:"Frozen Crystal",emoji:"❄️",bg:"#193e59",water:"#78d8ef",platform:"#d8f4ff",accent:"#a9f3ff",hazard:"ice"},
+ {name:"Energy Factory",emoji:"⚡",bg:"#171b45",water:"#493db7",platform:"#d7d4ec",accent:"#67e8f9",hazard:"energy"},
+ {name:"Cosmic Rift",emoji:"🌌",bg:"#100d2d",water:"#291f65",platform:"#d5d0ff",accent:"#d8b4fe",hazard:"space"}
+];
+
+const questions=[
+ ["น้ำบริสุทธิ์ที่ระดับน้ำทะเลเดือดประมาณกี่องศาเซลเซียส?",["50°C","100°C","150°C","200°C"],1],
+ ["พืชใช้แก๊สใดในการสังเคราะห์ด้วยแสง?",["ออกซิเจน","ไนโตรเจน","คาร์บอนไดออกไซด์","ไฮโดรเจน"],2],
+ ["แรงใดดึงวัตถุเข้าหาพื้นโลก?",["แรงเสียดทาน","แรงโน้มถ่วง","แรงแม่เหล็ก","แรงลอยตัว"],1],
+ ["หน่วยพื้นฐานของสิ่งมีชีวิตคืออะไร?",["อะตอม","เซลล์","โมเลกุล","เนื้อเยื่อ"],1],
+ ["ดาวเคราะห์ดวงใดอยู่ใกล้ดวงอาทิตย์ที่สุด?",["โลก","ดาวอังคาร","ดาวพุธ","ดาวพฤหัสบดี"],2],
+ ["น้ำแข็งเปลี่ยนเป็นน้ำเรียกการเปลี่ยนสถานะว่าอะไร?",["การระเหย","การหลอมเหลว","การควบแน่น","การระเหิด"],1],
+ ["โลหะชนิดใดเป็นของเหลวที่อุณหภูมิห้อง?",["เหล็ก","ทองแดง","ปรอท","อะลูมิเนียม"],2],
+ ["เสียงเดินทางผ่านสุญญากาศได้หรือไม่?",["ได้","ไม่ได้","ได้เฉพาะเสียงสูง","ได้เฉพาะเสียงต่ำ"],1],
+ ["อวัยวะใดสูบฉีดเลือดไปทั่วร่างกาย?",["ปอด","หัวใจ","ตับ","ไต"],1],
+ ["พลังงานจากการเคลื่อนที่เรียกว่าอะไร?",["พลังงานศักย์","พลังงานจลน์","พลังงานเคมี","พลังงานนิวเคลียร์"],1],
+ ["กระแสไฟฟ้าไหลได้ดีในวัสดุประเภทใด?",["ฉนวน","ตัวนำ","แก้ว","ยาง"],1],
+ ["ชั้นบรรยากาศที่มีโอโซนมากคือชั้นใด?",["โทรโพสเฟียร์","สตราโตสเฟียร์","มีโซสเฟียร์","เอกโซสเฟียร์"],1],
+ ["สิ่งใดเป็นดาวฤกษ์?",["โลก","ดวงจันทร์","ดวงอาทิตย์","ดาวเทียม"],2],
+ ["H2O คือสูตรเคมีของสารใด?",["ออกซิเจน","เกลือ","น้ำ","คาร์บอนไดออกไซด์"],2],
+ ["การเปลี่ยนน้ำเป็นไอเรียกว่าอะไร?",["การแข็งตัว","การระเหย","การหลอมเหลว","การควบแน่น"],1],
+ ["อวัยวะใดใช้แลกเปลี่ยนแก๊สในมนุษย์?",["หัวใจ","ปอด","กระเพาะ","สมอง"],1],
+ ["แม่เหล็กมีขั้วหลักกี่ขั้ว?",["1","2","3","4"],1],
+ ["แสงเดินทางเร็วกว่าเสียงหรือไม่?",["เร็วกว่า","ช้ากว่า","เท่ากัน","ไม่สามารถเปรียบเทียบ"],0],
+ ["สิ่งมีชีวิตชนิดใดสร้างอาหารเองได้?",["พืชสีเขียว","เสือ","เห็ด","มนุษย์"],0],
+ ["ดาวเคราะห์ดวงใดมีวงแหวนเด่นชัด?",["ดาวเสาร์","โลก","ดาวพุธ","ดาวศุกร์"],0],
+ ["กรดทำให้กระดาษลิตมัสสีน้ำเงินเปลี่ยนเป็นสีใด?",["แดง","เขียว","เหลือง","ไม่เปลี่ยน"],0],
+ ["อุณหภูมิเป็นการวัดสิ่งใด?",["ความร้อน/ความเย็น","มวล","ระยะทาง","แรง"],0],
+ ["หน่วยของแรงในระบบ SI คืออะไร?",["วัตต์","นิวตัน","จูล","ปาสคาล"],1],
+ ["พลังงานแสงอาทิตย์จัดเป็นพลังงานแบบใด?",["ทดแทนได้","ใช้แล้วหมดทันที","ฟอสซิล","นิวเคลียร์"],0],
+ ["การหมุนรอบตัวเองของโลกทำให้เกิดอะไร?",["ฤดูกาล","กลางวันกลางคืน","น้ำขึ้นน้ำลงทั้งหมด","สุริยุปราคา"],1]
+];
+
+function unusedQuestion(){
+ let available=questions.map((_,i)=>i).filter(i=>!save.usedQuestions.includes(i));
+ if(!available.length){save.usedQuestions=[];available=questions.map((_,i)=>i); persist();}
+ return available[Math.floor(Math.random()*available.length)];
+}
+
+let audioCtx=null,musicTimer=null;
+function audioStart(){
+ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ if(audioCtx.state==="suspended")audioCtx.resume();
+}
+function tone(freq,dur,type="sine",vol=.08){
+ if(!audioCtx||save.sfx<=0)return;
+ const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=freq;
+ g.gain.setValueAtTime(.0001,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(Math.max(.0001,vol*save.sfx),audioCtx.currentTime+.01);
+ g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+dur);o.connect(g).connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur+.02);
+}
+function menuMusic(){
+ audioStart(); if(musicTimer||save.music<=0)return;
+ const notes=[261.63,329.63,392,329.63,293.66,349.23,440,349.23];let n=0;
+ musicTimer=setInterval(()=>{if(state!=="menu"||save.music<=0)return;tone(notes[n++%notes.length],.55,"sine",.035*save.music);},650);
+}
+function stopMusic(){clearInterval(musicTimer);musicTimer=null}
+function sfxCoin(){tone(880,.08,"triangle",.12);setTimeout(()=>tone(1320,.1,"triangle",.08),45)}
+function sfxJump(){tone(390,.1,"square",.05);tone(620,.12,"sine",.04)}
+function sfxPortal(){tone(180,.4,"sine",.08);setTimeout(()=>tone(420,.45,"sine",.07),120);setTimeout(()=>tone(900,.5,"triangle",.06),260)}
+function sfxFail(){tone(90,.45,"sawtooth",.09);setTimeout(()=>tone(55,.35,"sawtooth",.07),100)}
+function sfxQuestion(){tone(620,.12,"sine",.08);setTimeout(()=>tone(820,.16,"sine",.06),100)}
+function sfxCorrect(){tone(740,.1,"triangle",.1);setTimeout(()=>tone(1100,.2,"triangle",.08),100)}
+function sfxAmbient(){
+ const st=stages[currentStage];
+ if(st.hazard==="water") { if(Math.random()<.22)tone(240,.12,"sine",.025); }
+ if(st.hazard==="lava") { if(Math.random()<.2)tone(75,.2,"sawtooth",.025); }
+ if(st.hazard==="energy") { if(Math.random()<.12)tone(180+Math.random()*180,.1,"square",.02); }
+}
+
+let state="menu",currentStage=0,worldX=0,last=performance.now(),distance=0;
+let animTime=0,shake=0,portalPulse=0,waterTime=0;
+let cameraBob=0,cameraTilt=0,cameraZoom=1,portalPull=0,portalFinish=0;
+let player={x:0,y:0,vy:0,ground:false,jumps:0,immortal:0};
+let platforms=[],coins=[],boxes=[],portal=null;
+let particles=[],birds=[],frogs=[];
+let runStart=0,stageCoins=0,stageDone=false;
+
+function resetStage(){
+ worldX=0;distance=0;stageCoins=0;stageDone=false;portalPull=0;portalFinish=0;cameraTilt=0;cameraZoom=1;
+ player={x:110,y:H*.5,vy:0,ground:false,jumps:0,immortal:0};
+ platforms=[];coins=[];boxes=[];particles=[];birds=[];frogs=[];
+ let x=20;
+ const count=34+currentStage*3;
+ for(let i=0;i<count;i++){
+   const gap=38+Math.random()*(38+currentStage*12);
+   const len=Math.max(82,125+Math.random()*90-currentStage*6);
+   x+=gap;
+   const wave=Math.sin(i*.8+currentStage)*Math.min(H*.10,65);
+   const y=H*.48+wave+(Math.random()-.5)*Math.min(H*.14,85);
+   platforms.push({x,y,w:Math.max(82,len),h:18,depth:14+Math.random()*10,tilt:(Math.random()-.5)*.08});
+   if(i%2===0||Math.random()<.7)coins.push({x:x+len*.5,y:y-30,r:8,taken:false});
+   if(i>1&&i<count-2&&Math.random()<.12)boxes.push({x:x+len*.72,y:y-34,hit:false});
+   x+=len;
+ }
+ portal={x:x+120,y:H*.48,r:42};
+ for(let i=0;i<5;i++)birds.push({x:Math.random()*W,y:80+Math.random()*180,s:25+Math.random()*25});
+ for(let i=0;i<4;i++)frogs.push({x:Math.random()*W,y:H*.62+Math.random()*90,t:Math.random()*5});
+ $("stage").textContent=currentStage+1;
+}
+function worldToScreenX(x){return x-worldX}
+function jump(){
+ if(state!=="playing")return;
+ if(player.ground||player.jumps<2){
+   player.vy=-610;player.ground=false;player.jumps++;
+   sfxJump(); for(let i=0;i<6;i++)burst(player.x,player.y+12,"#fff",1);
+ }
+}
+function startGame(){
+ audioStart();menuMusic();stopMusic();state="playing";currentStage=0;save.falls=save.falls;runStart=performance.now();resetStage();
+ $("menu").classList.add("hidden");$("hud").style.display="flex";$("jumpBtn").style.display="block";$("pauseBtn").style.display="block";$("menuBtn").style.display="block";$("failOverlay").classList.add("hidden");
+}
+function nextStage(){
+ portalPull=0;portalFinish=0;currentStage++;
+ if(currentStage>=5){finishGame();return}
+ resetStage();
+ toast("ผ่านด่าน! เตรียมตัวเข้าสู่ "+stages[currentStage].name);
+}
+function finishGame(){
+ state="menu";save.portals++;save.best=Math.max(save.best,Math.floor(distance)+stageCoins);save.distance+=Math.floor(distance);persist();
+ $("hud").style.display="none";$("jumpBtn").style.display="none";$("pauseBtn").style.display="none";$("menuBtn").style.display="none";$("failOverlay").classList.add("hidden");
+ $("menu").classList.remove("hidden");updateMenu();toast("🏆 จบครบ 5 ด่าน! +"+stageCoins+" เหรียญ");
+ menuMusic();
+}
+function fail(){
+ if(player.immortal>0||state==="failed")return;
+ state="failed";save.falls++;persist();sfxFail();
+ burst(player.x,player.y,"#fff",22);
+ $("failMessage").textContent=stages[currentStage].emoji+" คุณพลาดในด่าน "+(currentStage+1)+" • "+stages[currentStage].name;
+ $("failOverlay").classList.remove("hidden");
+ $("jumpBtn").style.display="none";$("pauseBtn").style.display="none";
+}
+function collectCoin(c){
+ c.taken=true;
+ stageCoins+=10;
+ save.coins+=10;
+ persist();
+ sfxCoin();
+ burst(c.x,c.y,stages[currentStage].accent,8);
+}
+function hitBox(b){
+ if(b.hit)return;b.hit=true;sfxQuestion();openQuestion();
+}
+function openQuestion(){
+ state="question";const qi=unusedQuestion();save.usedQuestions.push(qi);save.questions++;persist();
+ const q=questions[qi];$("qStage").textContent=stages[currentStage].emoji+" กล่องวิทยาศาสตร์ • คำถามที่ "+save.questions;
+ $("qText").textContent=q[0];$("answers").innerHTML="";
+ q[1].forEach((a,i)=>{const btn=document.createElement("button");btn.className="answer";btn.textContent=(["A","B","C","D"][i])+"  "+a;btn.onclick=()=>answer(i,q[2]);$("answers").appendChild(btn)});
+ $("questionModal").classList.remove("hidden");
+}
+function answer(i,correct){
+ $("questionModal").classList.add("hidden");state="playing";
+ if(i===correct){
+   save.correct++;
+ stageCoins+=200;
+ save.coins+=200;
+ sfxCorrect();
+ toast("✅ ถูกต้อง! +200 เหรียญ");
+   if(Math.random()<.04){player.immortal=4;toast("⚡ IMMORTAL 4 วินาที!");}
+   persist();
+ }else{toast("❌ ยังไม่ถูก ไม่ได้รับโบนัส");}
+}
+function burst(x,y,color,n){
+ for(let i=0;i<n;i++)particles.push({x,y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.5+Math.random()*.5,color});
+}
+function toast(t){$("toast").textContent=t;$("toast").classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>$("toast").classList.remove("show"),1500)}
+
+function update(dt){
+ animTime+=dt; waterTime+=dt; portalPulse+=dt*4;
+ shake=Math.max(0,shake-dt*3);
+ cameraBob=Math.sin(animTime*7)*1.5;
+
+ if(state==="portal"){
+   portalPull=Math.min(1,portalPull+dt*1.8);
+   if(portal){
+     const dx=portal.x-player.x,dy=portal.y-player.y;
+     player.x+=dx*Math.min(1,dt*(2.2+portalPull*4));
+     player.y+=dy*Math.min(1,dt*(2.2+portalPull*4));
+     player.vy=0;
+     for(let i=0;i<5;i++)burst(player.x+(Math.random()-.5)*18,player.y+(Math.random()-.5)*18,stages[currentStage].accent,1);
+     if(Math.hypot(dx,dy)<8){
+       portalFinish+=dt;
+       if(portalFinish>.45){sfxPortal();nextStage();return;}
+     }
+   }
+ }
+ if(state!=="playing" && state!=="portal")return;
+
+ const speed=260+currentStage*18;
+ if(state==="playing"){
+   worldX+=speed*dt;distance+=speed*dt*.01;
+   player.vy+=1450*dt;player.y+=player.vy*dt;
+   player.x=worldX+115;
+   player.ground=false;
+   for(const p of platforms){
+     if(player.x+12>p.x&&player.x-12<p.x+p.w&&player.y+18>=p.y&&player.y+18<=p.y+28&&player.vy>=0){
+       player.y=p.y-18;player.vy=0;player.ground=true;player.jumps=0;
+     }
+   }
+   if(player.immortal>0)player.immortal=Math.max(0,player.immortal-dt);
+   for(const c of coins)if(!c.taken&&Math.hypot(c.x-player.x,c.y-player.y)<28)collectCoin(c);
+   for(const b of boxes)if(!b.hit&&Math.hypot(b.x-player.x,b.y-player.y)<30)hitBox(b);
+   if(portal&&Math.hypot(portal.x-player.x,portal.y-player.y)<portal.r+18){
+     state="portal";portalPull=.05;portalFinish=0;shake=.8;sfxPortal();
+   }
+   if(player.y>H+80){
+     shake=1;
+     const st=stages[currentStage];
+     burst(player.x,Math.min(H-20,player.y),st.hazard==="lava"?"#ff9d38":"#b7f7ff",18);
+     fail();
+   }
+ }
+
+ for(const p of particles){
+   if(state==="portal"&&portal){
+     const dx=portal.x-p.x,dy=portal.y-p.y,d=Math.max(1,Math.hypot(dx,dy));
+     p.vx+=dx/d*220*dt;p.vy+=dy/d*220*dt;
+   }
+   p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
+ }
+ particles=particles.filter(p=>p.life>0);
+ for(const b of birds){b.x-=b.s*dt;if(b.x<-50)b.x=W+50}
+ for(const f of frogs){f.t+=dt}
+
+ const targetTilt=state==="portal"?Math.sin(animTime*5)*.07:(function(){
+   const p=platforms.find(q=>q.x+q.w>player.x);
+   return p?Math.max(-.045,Math.min(.045,p.tilt+(Math.sin((p.x-player.x)*.004)*.012))):0;
+ })();
+ cameraTilt+=(targetTilt-cameraTilt)*Math.min(1,dt*3.5);
+ const targetZoom=state==="portal"?1.12:1;
+ cameraZoom+=(targetZoom-cameraZoom)*Math.min(1,dt*3);
+
+ $("coins").textContent=save.coins.toLocaleString();$("distance").textContent=Math.floor(distance);
+ sfxAmbient();
+}
+function draw(){
+ const st=stages[currentStage];ctx.clearRect(0,0,W,H);
+ ctx.save();
+ if(shake>0){ctx.translate((Math.random()-.5)*shake*5,(Math.random()-.5)*shake*5)}
+ const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,st.bg);grad.addColorStop(1,st.water);ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+ for(let i=0;i<35;i++){const x=(i*97-worldX*.08)%W,y=(i*53)%H;ctx.globalAlpha=.08;ctx.fillStyle=st.accent;ctx.beginPath();ctx.arc((x+W)%W,y,2+(i%3),0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
+ if(st.hazard==="water")drawSwamp();
+ if(st.hazard==="lava")drawLava();
+ if(st.hazard==="ice")drawIce();
+ if(st.hazard==="energy")drawEnergy();
+ if(st.hazard==="space")drawSpace();
+
+ // 3D camera: the world tilts and zooms while following the route / portal.
+ ctx.save();
+ ctx.translate(W/2,H/2);ctx.rotate(cameraTilt);ctx.scale(cameraZoom,cameraZoom);ctx.translate(-W/2,-H/2);
+
+ // thick separated route blocks with visible side faces
+ for(const p of platforms){
+   const sx=worldToScreenX(p.x);if(sx>W+80||sx+p.w<-80)continue;
+   const d=p.depth||18,sk=Math.sin(p.tilt||0)*10;
+   ctx.save();
+   ctx.shadowColor="rgba(0,0,0,.32)";ctx.shadowBlur=12;ctx.shadowOffsetY=8;
+   ctx.fillStyle="rgba(0,0,0,.22)";ctx.beginPath();
+   ctx.moveTo(sx+6,p.y+d+5);ctx.lineTo(sx+p.w+6,p.y+d+5);ctx.lineTo(sx+p.w,p.y+5);ctx.lineTo(sx,p.y+5);ctx.closePath();ctx.fill();
+   ctx.shadowColor="transparent";
+   ctx.fillStyle="rgba(0,0,0,.22)";ctx.beginPath();
+   ctx.moveTo(sx,p.y);ctx.lineTo(sx+p.w,p.y);ctx.lineTo(sx+p.w-8+sk,p.y+d);ctx.lineTo(sx+8+sk,p.y+d);ctx.closePath();ctx.fill();
+   ctx.fillStyle=st.platform;ctx.beginPath();
+   ctx.moveTo(sx,p.y);ctx.lineTo(sx+p.w,p.y);ctx.lineTo(sx+p.w-8,p.y-7);ctx.lineTo(sx+8,p.y-7);ctx.closePath();ctx.fill();
+   ctx.fillStyle="rgba(255,255,255,.22)";ctx.fillRect(sx+12,p.y-5,Math.max(12,p.w*.35),3);
+   ctx.restore();
+ }
+
+ // coins
+ for(const c of coins)if(!c.taken){const sx=worldToScreenX(c.x);if(sx>-20&&sx<W+20){
+   ctx.save();ctx.translate(sx,c.y-7);ctx.rotate(Math.sin(animTime*5+c.x)*.18);ctx.fillStyle="#ffd83d";ctx.shadowBlur=10;ctx.shadowColor="#ffd83d";
+   ctx.beginPath();ctx.ellipse(0,0,8,11,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#fff1a6";ctx.stroke();ctx.restore();
+ }}
+ // question boxes
+ for(const b of boxes)if(!b.hit){const sx=worldToScreenX(b.x);ctx.save();ctx.translate(sx,b.y-14);ctx.rotate(Math.sin(animTime*3+b.x)*.05);ctx.fillStyle="#8b5cf6";ctx.shadowBlur=15;ctx.shadowColor="#8b5cf6";roundBox(-14,-14,28,28,6);ctx.fillStyle="#fff";ctx.font="bold 18px system-ui";ctx.textAlign="center";ctx.fillText("?",0,6);ctx.restore()}
+
+ // portal
+ if(portal){const sx=worldToScreenX(portal.x);if(sx>-140&&sx<W+140)drawPortal(sx,portal.y,portal.r)}
+ drawPlayer(worldToScreenX(player.x),player.y);
+ for(const p of particles){ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(worldToScreenX(p.x),p.y,2.5+Math.max(0,p.life*2),0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
+ drawHints();
+ ctx.restore();
+ ctx.restore();
+ if(state==="portal"){
+   const a=Math.min(.55,portalPull*.55);ctx.fillStyle=`rgba(255,255,255,${a})`;ctx.fillRect(0,0,W,H);
+ }
+}
+function roundRect(c,x,y,w,h,r){c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function roundBox(x,y,w,h,r){ctx.beginPath();roundRect(ctx,x,y,w,h,r);ctx.fill()}
+function drawPlayer(x,y){
+ ctx.save();ctx.translate(x,y+cameraBob);
+ const run=Math.sin(animTime*14), bob=Math.abs(run)*1.2;ctx.translate(0,-bob);
+ const type=save.selected||"default";
+ if(player.immortal>0||state==="portal"){
+   ctx.strokeStyle=state==="portal"?stages[currentStage].accent:stages[currentStage].accent;ctx.lineWidth=4;ctx.shadowBlur=24;ctx.shadowColor=stages[currentStage].accent;
+   const rr=state==="portal"?30+portalPull*20:30+Math.sin(animTime*10)*3;ctx.beginPath();ctx.arc(0,-4,rr,0,Math.PI*2);ctx.stroke();
+ }
+ ctx.lineCap="round";
+ if(type==="robot"){
+   ctx.strokeStyle="#17232d";ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-5,15);ctx.lineTo(-8+run*4,28);ctx.moveTo(5,15);ctx.lineTo(8-run*4,28);ctx.stroke();
+   ctx.fillStyle="#65717c";ctx.beginPath();roundRect(ctx,-13,-8,26,29,6);ctx.fill();ctx.fillStyle="#26d9ef";ctx.fillRect(-9,1,18,4);
+   ctx.strokeStyle="#9aa6af";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-11,-1);ctx.lineTo(-18-run*4,9);ctx.moveTo(11,-1);ctx.lineTo(18+run*4,9);ctx.stroke();
+   ctx.fillStyle="#46515b";ctx.beginPath();roundRect(ctx,-14,-31,28,22,7);ctx.fill();ctx.fillStyle="#10222e";ctx.fillRect(-9,-25,18,8);ctx.fillStyle="#55f3ff";ctx.fillRect(-6,-22,3,3);ctx.fillRect(3,-22,3,3);
+   ctx.strokeStyle="#b7c3ca";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,-31);ctx.lineTo(0,-39);ctx.stroke();ctx.fillStyle="#ff4d5f";ctx.beginPath();ctx.arc(0,-41,3,0,Math.PI*2);ctx.fill();
+ }else if(type==="scientist"){
+   ctx.strokeStyle="#233044";ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-5,15);ctx.lineTo(-8+run*4,28);ctx.moveTo(5,15);ctx.lineTo(8-run*4,28);ctx.stroke();
+   ctx.fillStyle="#f5f7fa";ctx.beginPath();roundRect(ctx,-14,-8,28,30,5);ctx.fill();ctx.fillStyle="#4ade80";ctx.fillRect(-9,0,18,4);ctx.fillStyle="#d8dee7";ctx.fillRect(-2,-7,4,28);
+   ctx.strokeStyle="#f5f7fa";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-12,-1);ctx.lineTo(-19-run*4,9);ctx.moveTo(12,-1);ctx.lineTo(19+run*4,9);ctx.stroke();
+   ctx.fillStyle="#f7f1e8";ctx.beginPath();ctx.arc(0,-19,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#ffffff";ctx.fillRect(-14,-32,28,5);ctx.fillRect(-10,-35,20,4);
+   ctx.strokeStyle="#66b5ff";ctx.lineWidth=2;ctx.strokeRect(-9,-23,7,6);ctx.strokeRect(2,-23,7,6);ctx.beginPath();ctx.moveTo(-2,-20);ctx.lineTo(2,-20);ctx.stroke();
+ }else if(type==="energy"){
+   ctx.strokeStyle="#25173e";ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-5,15);ctx.lineTo(-8+run*4,28);ctx.moveTo(5,15);ctx.lineTo(8-run*4,28);ctx.stroke();
+   ctx.fillStyle="#3b245f";ctx.beginPath();roundRect(ctx,-13,-8,26,30,8);ctx.fill();ctx.fillStyle="#ffd84d";ctx.beginPath();ctx.moveTo(3,-3);ctx.lineTo(-4,7);ctx.lineTo(2,7);ctx.lineTo(-2,16);ctx.lineTo(7,4);ctx.lineTo(1,4);ctx.closePath();ctx.fill();
+   ctx.strokeStyle="#ffd84d";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-11,-1);ctx.lineTo(-18-run*4,9);ctx.moveTo(11,-1);ctx.lineTo(18+run*4,9);ctx.stroke();
+   ctx.fillStyle="#f7f1e8";ctx.beginPath();ctx.arc(0,-19,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#4b2b70";ctx.beginPath();ctx.arc(0,-20,13,Math.PI,Math.PI*2);ctx.fill();ctx.fillStyle="#ffd84d";ctx.beginPath();ctx.moveTo(-8,-30);ctx.lineTo(-3,-38);ctx.lineTo(0,-30);ctx.lineTo(4,-38);ctx.lineTo(9,-30);ctx.closePath();ctx.fill();
+ }else if(type==="rift"){
+   ctx.strokeStyle="#211632";ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-5,15);ctx.lineTo(-8+run*4,28);ctx.moveTo(5,15);ctx.lineTo(8-run*4,28);ctx.stroke();
+   ctx.fillStyle="#542a78";ctx.beginPath();roundRect(ctx,-13,-8,26,30,9);ctx.fill();ctx.fillStyle="#d9b4ff";ctx.fillRect(-9,0,18,4);
+   ctx.strokeStyle="#d9b4ff";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-11,-1);ctx.lineTo(-18-run*4,9);ctx.moveTo(11,-1);ctx.lineTo(18+run*4,9);ctx.stroke();
+   ctx.fillStyle="#eee7ff";ctx.beginPath();ctx.arc(0,-19,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#6f35a0";ctx.beginPath();ctx.arc(0,-20,13,Math.PI,Math.PI*2);ctx.fill();
+   ctx.strokeStyle="#caa5ff";ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-19,8,0,Math.PI*2);ctx.stroke();
+ }else{
+   ctx.strokeStyle="#152c3a";ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-5,16);ctx.lineTo(-8+run*4,28);ctx.moveTo(5,16);ctx.lineTo(8-run*4,28);ctx.stroke();
+   ctx.fillStyle="#18344b";ctx.beginPath();roundRect(ctx,-12,-7,24,28,8);ctx.fill();ctx.fillStyle=stages[currentStage].accent;ctx.globalAlpha=.9;ctx.fillRect(-8,1,16,4);ctx.globalAlpha=1;
+   ctx.strokeStyle="#f7f1e8";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-10,-1);ctx.lineTo(-17-run*5,9);ctx.moveTo(10,-1);ctx.lineTo(17+run*5,9);ctx.stroke();
+   ctx.fillStyle="#f7f1e8";ctx.beginPath();ctx.arc(0,-18,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#111";ctx.beginPath();ctx.arc(-4,-20,2,0,Math.PI*2);ctx.arc(4,-20,2,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle="#ffce4a";ctx.beginPath();ctx.moveTo(8,-10);ctx.lineTo(18,-7);ctx.lineTo(10,-2);ctx.closePath();ctx.fill();
+ }
+ ctx.restore();
+}
+function drawPortal(x,y,r){
+ ctx.save();ctx.translate(x,y);ctx.globalCompositeOperation="lighter";
+ const pull=state==="portal"?portalPull:0;
+ const pulse=1+Math.sin(portalPulse)*.08;
+ // outer energy rings
+ for(let i=7;i>=0;i--){ctx.globalAlpha=.018+i*.018;ctx.fillStyle=stages[currentStage].accent;ctx.beginPath();ctx.arc(0,0,(r+i*9+pull*24)*pulse,0,Math.PI*2);ctx.fill()}
+ for(let i=0;i<4;i++){ctx.save();ctx.rotate(animTime*(i%2?-.9:1.15)+i*1.7);ctx.strokeStyle=i===0?"#fff":stages[currentStage].accent;ctx.lineWidth=3+i%2;ctx.shadowBlur=18;ctx.shadowColor=stages[currentStage].accent;ctx.beginPath();ctx.arc(0,0,r*(.55+i*.16),i*.8,i*.8+Math.PI*1.25);ctx.stroke();ctx.restore()}
+ // vortex core
+ const g=ctx.createRadialGradient(0,0,2,0,0,r*.72);g.addColorStop(0,"#fff");g.addColorStop(.12,stages[currentStage].accent);g.addColorStop(.42,"rgba(20,10,50,.95)");g.addColorStop(1,"rgba(0,0,0,0)");ctx.globalAlpha=.95;ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r*.82,0,Math.PI*2);ctx.fill();
+ ctx.globalAlpha=1;ctx.strokeStyle="#fff";ctx.lineWidth=4;ctx.shadowBlur=30;ctx.shadowColor=stages[currentStage].accent;ctx.beginPath();ctx.arc(0,0,r*pulse,0,Math.PI*2);ctx.stroke();
+ // particles orbiting then being sucked inward
+ for(let i=0;i<28;i++){
+   const a=animTime*(1.2+i%4*.18)+i*Math.PI*2/28;
+   const base=r+20+Math.sin(i*2.1)*14;
+   const rr=state==="portal"?base*(1-pull*.82):base;
+   const px=Math.cos(a)*rr,py=Math.sin(a)*rr;ctx.fillStyle=i%3===0?"#fff":stages[currentStage].accent;ctx.globalAlpha=.45+.45*(i%2);
+   ctx.beginPath();ctx.arc(px,py,1.5+(i%3),0,Math.PI*2);ctx.fill();
+ }
+ if(state==="portal"){ctx.globalAlpha=.5;ctx.strokeStyle="#fff";ctx.lineWidth=2;for(let i=0;i<8;i++){const a=animTime*2+i*Math.PI/4;const rr=r*(1.2-pull*.7);ctx.beginPath();ctx.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);ctx.lineTo(Math.cos(a)*r*.35,Math.sin(a)*r*.35);ctx.stroke()}}
+ ctx.restore();
+}
+function drawVignette(){
+ const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.18,W/2,H/2,Math.max(W,H)*.72);
+ g.addColorStop(0,"rgba(255,255,255,0)");
+ g.addColorStop(1,"rgba(0,0,0,.28)");
+ ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+}
+function drawHints(){
+ const st=stages[currentStage];
+ ctx.globalAlpha=.18;
+ ctx.fillStyle=st.accent;
+ for(let i=0;i<8;i++){
+   const x=((i*190-worldX*.45)%W+W)%W;
+   const y=H*.15+((i*71)%Math.max(120,H*.65));
+   ctx.beginPath();ctx.arc(x,y,2+(i%3),0,Math.PI*2);ctx.fill();
+ }
+ ctx.globalAlpha=1;
+}
+function drawSwamp(){
+ ctx.globalAlpha=.18;ctx.fillStyle="#073b3b";
+ for(let i=0;i<14;i++){let x=(i*130-worldX*.2)%W;ctx.beginPath();ctx.arc((x+W)%W,120+(i%5)*85,35,0,Math.PI*2);ctx.fill()}
+ ctx.globalAlpha=.22;ctx.strokeStyle="#8ff3df";ctx.lineWidth=2;
+ for(let i=0;i<8;i++){let x=((i*170-worldX*.28)%W+W)%W,y=H*.28+(i%5)*90;ctx.beginPath();ctx.arc(x,y,18+Math.sin(waterTime*2+i)*5,0,Math.PI*2);ctx.stroke()}
+ ctx.globalAlpha=1;
+ for(const b of birds){ctx.strokeStyle="#173b3d";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.quadraticCurveTo(b.x+8,b.y-8,b.x+16,b.y);ctx.quadraticCurveTo(b.x+24,b.y-8,b.x+32,b.y);ctx.stroke()}
+ for(const f of frogs){const x=(f.x+W)%W,y=f.y+Math.sin(f.t*2)*2;ctx.fillStyle="#2cc46a";ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(x-4,y-6,3,0,Math.PI*2);ctx.arc(x+4,y-6,3,0,Math.PI*2);ctx.fill()}
+}
+function drawLava(){
+ ctx.fillStyle="#ff6a00";ctx.globalAlpha=.16;
+ for(let i=0;i<10;i++){let x=(i*170-worldX*.4)%W;ctx.beginPath();ctx.arc((x+W)%W,H*.2+(i%4)*150,55+Math.sin(animTime*2+i)*8,0,Math.PI*2);ctx.fill()}
+ ctx.globalAlpha=.35;ctx.strokeStyle="#ff9d38";ctx.lineWidth=3;
+ for(let i=0;i<7;i++){let x=((i*210-worldX*.55)%W+W)%W;ctx.beginPath();ctx.moveTo(x,H);ctx.quadraticCurveTo(x+20,H*.55,x-5,H*.18);ctx.stroke()}
+ ctx.globalAlpha=1;
+ for(let i=0;i<12;i++){let x=(i*111-worldX*.6)%W,y=H*.15+((i*77+performance.now()/8)%H);ctx.fillStyle="#ffd166";ctx.fillRect((x+W)%W,y,3,9)}
+}
+function drawIce(){ctx.globalAlpha=.35;ctx.strokeStyle="#c8f7ff";for(let i=0;i<10;i++){let x=(i*150-worldX*.25)%W;ctx.beginPath();ctx.moveTo((x+W)%W,0);ctx.lineTo((x+W)%W+40,H);ctx.stroke()}ctx.globalAlpha=1}
+function drawEnergy(){for(let i=0;i<8;i++){let x=(i*170-worldX*.3)%W;ctx.fillStyle="#67e8f9";ctx.globalAlpha=.18;ctx.fillRect((x+W)%W,H*.15,6,H*.65)}ctx.globalAlpha=1}
+function drawSpace(){ctx.fillStyle="#fff";for(let i=0;i<90;i++){let x=(i*73-worldX*.12)%W,y=(i*47)%H;ctx.globalAlpha=.35+(i%3)*.2;ctx.fillRect((x+W)%W,y,1.5,1.5)}ctx.globalAlpha=1}
+
+function openInfo(type){
+ let html="";
+ if(type==="how")html=`<h2>❓ วิธีเล่น</h2><p>ตัวละครวิ่งอัตโนมัติ แตะปุ่ม JUMP หรือกด SPACE เพื่อกระโดด และกดซ้ำกลางอากาศเพื่อ Double Jump</p><p>เก็บ 🪙 = +10 เหรียญ • กล่อง ❔ = คำถามวิทยาศาสตร์ • ตอบถูก = +200 เหรียญ และมีโอกาส 4% ได้อมตะ 4 วินาที • ไปให้ถึง 🌀 ประตูมิติ</p><p class="small">ถ้าตกน้ำ/ลาวา/พื้นที่อันตรายจะเริ่มด่านใหม่</p><button class="btn primary" onclick="closeInfo()">เข้าใจแล้ว</button>`;
+ if(type==="stats")html=`<h2>📊 สถิติ</h2><div class="stat"><span>🪙 เหรียญสะสม</span><b>${save.coins.toLocaleString()}</b></div><div class="stat"><span>🏆 คะแนนสูงสุด</span><b>${save.best.toLocaleString()}</b></div><div class="stat"><span>📏 ระยะทางรวม</span><b>${save.distance.toLocaleString()} m</b></div><div class="stat"><span>💦/🔥 ตกทั้งหมด</span><b>${save.falls}</b></div><div class="stat"><span>🔬 คำถามที่ตอบ</span><b>${save.questions}</b></div><div class="stat"><span>✅ ตอบถูก</span><b>${save.correct}</b></div><div class="stat"><span>🌀 ผ่านประตูมิติ</span><b>${save.portals}</b></div><button class="btn primary" onclick="closeInfo()">กลับ</button>`;
+ if(type==="settings")html=`<h2>⚙️ ตั้งค่า</h2><p>🎵 เพลงเมนู: <input class="range" id="musicRange" type="range" min="0" max="1" step=".05" value="${save.music}"></p><p>🔊 เสียงเอฟเฟกต์: <input class="range" id="sfxRange" type="range" min="0" max="1" step=".05" value="${save.sfx}"></p><button class="btn" onclick="saveSettings()">บันทึก</button><button class="btn" onclick="resetData()">รีเซ็ตข้อมูลเกม</button><button class="btn primary" onclick="closeInfo()">กลับ</button>`;
+ if(type==="shop")html=`<h2>🛒 ร้านค้าตัวละคร</h2><p>เหรียญของคุณ: <b>${save.coins.toLocaleString()}</b></p><div id="shopList"></div><button class="btn primary" onclick="closeInfo()">กลับ</button>`;
+ if(type==="about")html=`<h2>ℹ️ เกี่ยวกับเกม</h2><p><b>Science Rift</b> เป็นเกมวิทยาศาสตร์ HTML5 + Canvas + PWA ที่สร้างขึ้นสำหรับโปรเจกต์การเรียนรู้</p><p>เวอร์ชันนี้เป็น Prototype: มี 5 ธีมด่าน, Double Jump, เหรียญ, คำถาม, ประตูมิติ, สถิติ และบันทึกข้อมูล Offline</p><button class="btn primary" onclick="closeInfo()">กลับ</button>`;
+ $("infoContent").innerHTML=html;$("infoModal").classList.remove("hidden");
+ if(type==="shop")renderShop();
+}
+function renderShop(){
+ const chars=[["default","Explorer","ฟรี"],["robot","Robo","3000"],["scientist","Scientist","3000"],["energy","Energy","3000"],["rift","Rift Walker","3000"]];
+ const box=$("shopList");box.innerHTML="";
+ chars.forEach(c=>{const d=document.createElement("div");d.className="stat";let owned=save.owned.includes(c[0]);d.innerHTML=`<span>🧑 ${c[1]}<br><small>${c[2]} เหรียญ</small></span><button class="btn" style="width:auto;margin:0">${owned?(save.selected===c[0]?"✓ ใช้อยู่":"ใช้"):("ซื้อ "+c[2])}</button>`;d.querySelector("button").onclick=()=>{if(owned){save.selected=c[0];persist();renderShop()}else if(save.coins>=3000){save.coins-=3000;save.owned.push(c[0]);save.selected=c[0];persist();renderShop()}else toast("เหรียญไม่พอ");};box.appendChild(d)})
+}
+function saveSettings(){save.music=+$("musicRange").value;save.sfx=+$("sfxRange").value;persist();closeInfo();if(state==="menu")menuMusic()}
+function resetData(){if(confirm("รีเซ็ตเหรียญ สถิติ และตัวละครที่ซื้อทั้งหมด?")){localStorage.removeItem(saveKey);location.reload()}}
+function closeInfo(){$("infoModal").classList.add("hidden");if(state==="info")state="menu"}
+
+$("startBtn").onclick=startGame;
+$("shopBtn").onclick=()=>openInfo("shop");
+$("statsBtn").onclick=()=>openInfo("stats");
+$("settingsBtn").onclick=()=>openInfo("settings");
+$("howBtn").onclick=()=>openInfo("how");
+$("infoModal").addEventListener("click",e=>{if(e.target.id==="infoModal")closeInfo()});
+$("jumpBtn").addEventListener("pointerdown",e=>{e.preventDefault();jump()});
+$("pauseBtn").onclick=()=>{if(state==="playing"){state="paused";$("pauseBtn").textContent="▶"}else if(state==="paused"){state="playing";$("pauseBtn").textContent="Ⅱ"}};
+function retryStage(){
+ $("failOverlay").classList.add("hidden");state="playing";$("jumpBtn").style.display="block";$("pauseBtn").style.display="block";$("menuBtn").style.display="block";resetStage();
+}
+function goMenu(){
+ save.best=Math.max(save.best,Math.floor(distance)+stageCoins);
+ save.distance+=Math.floor(distance);persist();
+ state="menu";$("failOverlay").classList.add("hidden");$("hud").style.display="none";$("jumpBtn").style.display="none";$("pauseBtn").style.display="none";$("menuBtn").style.display="none";$("menu").classList.remove("hidden");$("pauseBtn").textContent="Ⅱ";menuMusic();
+}
+$("retryBtn").onclick=retryStage;$("failMenuBtn").onclick=goMenu;$("menuBtn").onclick=goMenu;
+addEventListener("keydown",e=>{if(e.code==="Space"){e.preventDefault();if(state==="menu")startGame();else jump()}});
+canvas.addEventListener("pointerdown",e=>{if(state==="playing")jump()});
+
+function loop(t){const dt=Math.min(.033,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(loop)}
+updateMenu();menuMusic();requestAnimationFrame(loop);
+</script>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
