@@ -208,13 +208,41 @@ function jump(){
 function startGame(){
  audioStart();menuMusic();stopMusic();state="playing";currentStage=0;save.falls=save.falls;runStart=performance.now();resetStage();
  $("menu").classList.add("hidden");$("hud").style.display="flex";$("jumpBtn").style.display="block";$("pauseBtn").style.display="block";$("menuBtn").style.display="block";$("failOverlay").classList.add("hidden");
-}
+} 
 function nextStage(){
- portalPull=0;portalFinish=0;currentStage++;
- if(currentStage>=5){finishGame();return}
- resetStage();
- toast("ผ่านด่าน! เตรียมตัวเข้าสู่ "+stages[currentStage].name);
-}
+  // ห้ามเปลี่ยนด่านถ้าไม่ได้อยู่ในขั้นตอน Portal
+  if(state!=="portal") return;
+
+  portalPull=0;
+  portalFinish=0;
+
+  // ด่าน 5 = จบเกม
+  if(currentStage>=4){
+    finishGame();
+    return;
+  }
+
+  // ไปแค่ด่านถัดไป 1 ด่าน
+  currentStage++;
+
+  // สร้างด่านใหม่
+  resetStage();
+
+  // สำคัญมาก!!
+  // ต้องกลับมาเป็น playing ไม่ใช่ portal
+  state="playing";
+
+  $("pauseBtn").textContent="Ⅱ";
+  $("jumpBtn").style.display="block";
+  $("pauseBtn").style.display="block";
+  $("menuBtn").style.display="block";
+
+  toast(
+    "🌀 ผ่านด่าน! เตรียมตัวเข้าสู่ "+
+    stages[currentStage].name
+  );
+
+}  
 function finishGame(){
  state="menu";save.portals++;save.best=Math.max(save.best,Math.floor(distance)+stageCoins);save.distance+=Math.floor(distance);persist();
  $("hud").style.display="none";$("jumpBtn").style.display="none";$("pauseBtn").style.display="none";$("menuBtn").style.display="none";$("failOverlay").classList.add("hidden");
